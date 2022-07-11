@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.funcards.category.proto.v1";
+option java_outer_classname = "CategoryProto";
+option go_package = "./;v1";
+option csharp_namespace = "FunCardsOrg.Grpc.V1";
+
+package proto.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service Category {
+  rpc CreateCategory(CreateCategoryRequest) returns (google.protobuf.Empty);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (google.protobuf.Empty);
+  rpc UpdateManyCategories(UpdateManyCategoriesRequest) returns (google.protobuf.Empty);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (google.protobuf.Empty);
+  rpc GetCategories(CategoriesRequest) returns (CategoriesResponse);
+}
+
+message CreateCategoryRequest {
+  string category_id = 1;
+  string owner_id = 2;
+  string board_id = 3;
+  string name = 4;
+  int32 position = 5;
+}
+
+message UpdateCategoryRequest {
+  string category_id = 1;
+  string board_id = 2;
+  string name = 3;
+  int32 position = 4;
+}
+
+message UpdateManyCategoriesRequest {
+  repeated UpdateCategoryRequest categories = 1;
+}
+
+message DeleteCategoryRequest {
+  string category_id = 1;
+}
+
+message CategoriesRequest {
+  uint64 page_index = 1;
+  uint32 page_size = 2;
+  repeated string category_ids = 3;
+  repeated string owner_ids = 4;
+  repeated string board_ids = 5;
+}
+
+message CategoriesResponse {
+  message Category {
+    string category_id = 1;
+    string owner_id = 2;
+    string board_id = 3;
+    string name = 4;
+    int32 position = 5;
+    google.protobuf.Timestamp created_at = 6;
+  }
+
+  uint64 total = 1;
+  repeated Category categories = 2;
+}
