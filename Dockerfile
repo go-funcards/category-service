@@ -1,4 +1,4 @@
-FROM golang:1.18.3-alpine as build
+FROM golang:1.18-alpine as build
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY . .
 RUN apk update \
 	&& apk add --no-cache build-base ca-certificates \
 	&& update-ca-certificates \
-    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/ .
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=1.0.0.beta -X main.buildDate=`date -u +%Y%m%d` -X main.buildTime=`date -u +%H%M%S`" -o release/ .
 
 FROM scratch
 
@@ -21,4 +21,4 @@ COPY --from=build /app/proto /proto/
 
 EXPOSE 80
 
-CMD ["/category-service", "serve"]
+CMD ["/category-service"]

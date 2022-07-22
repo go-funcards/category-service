@@ -1,19 +1,20 @@
-rules:
-  v1.CreateCategoryRequest:
-    CategoryId: "required,uuid4"
-    OwnerId: "required,uuid4"
-    BoardId: "required,uuid4"
-    Name: "required,min=1,max=150"
-  v1.UpdateCategoryRequest:
-    CategoryId: "required,uuid4"
-    BoardId: "omitempty,uuid4"
-    Name: "omitempty,min=1,max=150"
-  v1.UpdateManyCategoriesRequest:
-    Categories: "required,min=1,dive"
-  v1.DeleteCategoryRequest:
-    CategoryId: "required,uuid4"
-  v1.CategoriesRequest:
-    PageSize: "required,min=1,max=1000"
-    CategoryIds: "omitempty,dive,uuid4"
-    OwnerIds: "omitempty,dive,uuid4"
-    BoardIds: "omitempty,dive,uuid4"
+validation:
+  rules:
+    v1.CreateCategoryRequest:
+      CategoryId: "required,uuid4"
+      OwnerId: "required,uuid4"
+      BoardId: "required,uuid4"
+      Name: "required,min=1,max=150"
+    v1.UpdateCategoryRequest:
+      CategoryId: "required,uuid4"
+      BoardId: "omitempty,uuid4"
+      Name: "omitempty,min=1,max=150"
+    v1.UpdateManyCategoriesRequest:
+      Categories: "required,min=1,dive"
+    v1.DeleteCategoryRequest:
+      CategoryId: "required,uuid4"
+    v1.CategoriesRequest:
+      PageSize: "required,min=1,max=1000"
+      CategoryIds: "omitempty,dive,uuid4"
+      OwnerIds: "omitempty,dive,uuid4"
+      BoardIds: "omitempty,dive,uuid4"

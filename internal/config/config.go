@@ -1,22 +1,25 @@
 package config
 
 import (
-	"github.com/go-funcards/envconfig"
-	"github.com/go-funcards/grpc-server"
-	"github.com/go-funcards/logger"
-	"github.com/go-funcards/mongodb"
 	"github.com/go-funcards/validate"
+	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/sirupsen/logrus"
 	"sync"
 )
 
 type Config struct {
-	Debug   bool           `yaml:"debug" env:"DEBUG_MODE" env-default:"false"`
-	Log     logger.Config  `yaml:"log" env-prefix:"LOG_"`
-	MongoDB mongodb.Config `yaml:"mongodb" env-prefix:"MONGODB_"`
-	Server  struct {
-		Listen grpcserver.Config `yaml:"listen" env-prefix:"LISTEN_"`
-	} `yaml:"server" env-prefix:"SERVER_"`
-	Rules validate.TypeRules `yaml:"rules"`
+	Log struct {
+		Level string `yaml:"level" env:"LEVEL" env-default:"info"`
+	} `yaml:"log" env-prefix:"LOG_"`
+	MongoDB struct {
+		URI string `yaml:"uri" env:"URI" env-required:"true"`
+	} `yaml:"mongodb" env-prefix:"MONGODB_"`
+	GRPC struct {
+		Addr string `yaml:"address" env:"ADDR" env-default:":80"`
+	} `yaml:"grpc" env-prefix:"GRPC_"`
+	Validation struct {
+		Rules validate.TypeRules `yaml:"rules" env:"RULES"`
+	} `yaml:"validation" env-prefix:"VALIDATION_"`
 }
 
 var (
@@ -24,10 +27,13 @@ var (
 	once sync.Once
 )
 
-func GetConfig(path string) (Config, error) {
-	var err error
+func GetConfig(path string, log logrus.FieldLogger) Config {
 	once.Do(func() {
-		err = envconfig.ReadConfig(path, &cfg)
+		log.Debugf("read config from path %s", path)
+
+		if err := cleanenv.ReadConfig(path, &cfg); err != nil {
+			log.Fatal(err)
+		}
 	})
-	return cfg, err
+	return cfg
 }

@@ -6,7 +6,7 @@
 
 ```shell
 export MONGODB_URI="mongodb://username:password@0.0.0.0:27017/dbname?authsource=admin&authmechanism=SCRAM-SHA-256"
-DEBUG_MODE=true SERVER_LISTEN_PORT=8084 go run . serve
+LOG_LEVEL="debug" GRPC_ADDR=":8084" go run .
 ```
 
 ## License

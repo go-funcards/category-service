@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"github.com/go-funcards/category-service/internal/category"
 	"github.com/go-funcards/mongodb"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 	"time"
 )
 
@@ -20,24 +19,24 @@ const (
 )
 
 type storage struct {
-	c mongodb.Collection[category.Category]
+	c   *mongo.Collection
+	log logrus.FieldLogger
 }
 
-func NewStorage(ctx context.Context, db *mongo.Database, logger *zap.Logger) (*storage, error) {
-	s := &storage{c: mongodb.Collection[category.Category]{
-		Inner: db.Collection(collection),
-		Log:   logger,
-	}}
-
-	if err := s.indexes(ctx); err != nil {
-		return nil, err
+func NewStorage(ctx context.Context, db *mongo.Database, log logrus.FieldLogger) *storage {
+	s := &storage{
+		c:   db.Collection(collection),
+		log: log,
 	}
-
-	return s, nil
+	s.indexes(ctx)
+	return s
 }
 
-func (s *storage) indexes(ctx context.Context) error {
-	name, err := s.c.Inner.Indexes().CreateOne(ctx, mongo.IndexModel{
+func (s *storage) indexes(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	name, err := s.c.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{
 			{"owner_id", 1},
 			{"board_id", 1},
@@ -45,11 +44,17 @@ func (s *storage) indexes(ctx context.Context) error {
 			{"created_at", 1},
 		},
 	})
-	if err == nil {
-		s.c.Log.Info("index created", zap.String("collection", collection), zap.String("name", name))
+	if err != nil {
+		s.log.WithFields(logrus.Fields{
+			"collection": collection,
+			"error":      err,
+		}).Fatal("index not created")
 	}
 
-	return err
+	s.log.WithFields(logrus.Fields{
+		"collection": collection,
+		"name":       name,
+	}).Info("index created")
 }
 
 func (s *storage) Save(ctx context.Context, model category.Category) error {
@@ -57,12 +62,9 @@ func (s *storage) Save(ctx context.Context, model category.Category) error {
 }
 
 func (s *storage) SaveMany(ctx context.Context, models []category.Category) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	var write []mongo.WriteModel
 	for _, model := range models {
-		data, err := s.c.ToM(model)
+		data, err := mongodb.ToBson(model)
 		if err != nil {
 			return err
 		}
@@ -85,37 +87,71 @@ func (s *storage) SaveMany(ctx context.Context, models []category.Category) erro
 		)
 	}
 
-	s.c.Log.Debug("bulk update")
-	_, err := s.c.Inner.BulkWrite(ctx, write, options.BulkWrite())
+	s.log.Info("categories save")
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	result, err := s.c.BulkWrite(ctx, write)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("bulk update: %s", mongodb.ErrMsgQuery), err)
+		return fmt.Errorf(fmt.Sprintf("categories save: %s", mongodb.ErrMsgQuery), err)
 	}
+
+	s.log.WithFields(logrus.Fields{"result": result}).Info("categories saved")
+
 	return nil
 }
 
 func (s *storage) Delete(ctx context.Context, id string) error {
-	return s.c.DeleteOne(ctx, bson.M{"_id": id})
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	s.log.WithField("category_id", id).Debug("category delete")
+	result, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(mongodb.ErrMsgQuery, mongo.ErrNoDocuments)
+	}
+	s.log.WithField("category_id", id).Debug("category deleted")
+
+	return nil
 }
 
 func (s *storage) Find(ctx context.Context, filter category.Filter, index uint64, size uint32) ([]category.Category, error) {
-	return s.c.Find(ctx, s.filter(filter), s.c.FindOptions(index, size).
-		SetSort(bson.D{{"position", 1}, {"created_at", 1}}))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	opts := mongodb.FindOptions(index, size).SetSort(bson.D{{"position", 1}, {"created_at", 1}})
+	cur, err := s.c.Find(ctx, s.build(filter), opts)
+	if err != nil {
+		return nil, fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	return mongodb.DecodeAll[category.Category](ctx, cur)
 }
 
 func (s *storage) Count(ctx context.Context, filter category.Filter) (uint64, error) {
-	return s.c.CountDocuments(ctx, s.filter(filter))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	total, err := s.c.CountDocuments(ctx, s.build(filter))
+	if err != nil {
+		return 0, fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	return uint64(total), nil
 }
 
-func (s *storage) filter(filter category.Filter) bson.M {
-	f := make(bson.M)
+func (s *storage) build(filter category.Filter) any {
+	f := make(mongodb.Filter, 0)
 	if len(filter.CategoryIDs) > 0 {
-		f["_id"] = bson.M{"$in": filter.CategoryIDs}
+		f = append(f, mongodb.In("_id", filter.CategoryIDs))
 	}
 	if len(filter.OwnerIDs) > 0 {
-		f["owner_id"] = bson.M{"$in": filter.OwnerIDs}
+		f = append(f, mongodb.In("owner_id", filter.OwnerIDs))
 	}
 	if len(filter.BoardIDs) > 0 {
-		f["board_id"] = bson.M{"$in": filter.BoardIDs}
+		f = append(f, mongodb.In("board_id", filter.BoardIDs))
 	}
-	return f
+	return f.Build()
 }

@@ -21,7 +21,7 @@ type Filter struct {
 	BoardIDs    []string `json:"board_ids,omitempty"`
 }
 
-func (c Category) toResponse() *v1.CategoriesResponse_Category {
+func (c Category) toProto() *v1.CategoriesResponse_Category {
 	return &v1.CategoriesResponse_Category{
 		CategoryId: c.CategoryID,
 		OwnerId:    c.OwnerID,
