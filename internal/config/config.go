@@ -8,9 +8,6 @@ import (
 )
 
 type Config struct {
-	Log struct {
-		Level string `yaml:"level" env:"LEVEL" env-default:"info"`
-	} `yaml:"log" env-prefix:"LOG_"`
 	MongoDB struct {
 		URI string `yaml:"uri" env:"URI" env-required:"true"`
 	} `yaml:"mongodb" env-prefix:"MONGODB_"`

@@ -22,7 +22,7 @@ import (
 
 //go:generate sh genproto.sh
 
-const EnvConfigFile = "CONFIG_FILE"
+const envConfigFile = "CONFIG_FILE"
 
 var (
 	version    string
@@ -32,7 +32,7 @@ var (
 )
 
 func init() {
-	configFile = os.Getenv(EnvConfigFile)
+	configFile = os.Getenv(envConfigFile)
 	if configFile == "" {
 		flag.StringVar(&configFile, "c", "config.yaml", "application config path")
 		flag.Parse()
