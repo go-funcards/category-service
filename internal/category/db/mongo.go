@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/go-funcards/category-service/internal/category"
 	"github.com/go-funcards/mongodb"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"time"
@@ -20,13 +20,13 @@ const (
 
 type storage struct {
 	c   *mongo.Collection
-	log logrus.FieldLogger
+	log zerolog.Logger
 }
 
-func NewStorage(ctx context.Context, db *mongo.Database, log logrus.FieldLogger) *storage {
+func NewStorage(ctx context.Context, db *mongo.Database, log zerolog.Logger) *storage {
 	s := &storage{
 		c:   db.Collection(collection),
-		log: log,
+		log: log.With().Str("storage", "mongodb").Str("collection", collection).Logger(),
 	}
 	s.indexes(ctx)
 	return s
@@ -45,16 +45,10 @@ func (s *storage) indexes(ctx context.Context) {
 		},
 	})
 	if err != nil {
-		s.log.WithFields(logrus.Fields{
-			"collection": collection,
-			"error":      err,
-		}).Fatal("index not created")
+		s.log.Fatal().Err(err).Msg("index not created")
 	}
 
-	s.log.WithFields(logrus.Fields{
-		"collection": collection,
-		"name":       name,
-	}).Info("index created")
+	s.log.Info().Str("index.name", name).Msg("index created")
 }
 
 func (s *storage) Save(ctx context.Context, model category.Category) error {
@@ -87,7 +81,7 @@ func (s *storage) SaveMany(ctx context.Context, models []category.Category) erro
 		)
 	}
 
-	s.log.Info("categories save")
+	s.log.Info().Msg("categories save")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -97,7 +91,7 @@ func (s *storage) SaveMany(ctx context.Context, models []category.Category) erro
 		return fmt.Errorf(fmt.Sprintf("categories save: %s", mongodb.ErrMsgQuery), err)
 	}
 
-	s.log.WithFields(logrus.Fields{"result": result}).Info("categories saved")
+	s.log.Info().Interface("result", result).Msg("categories saved")
 
 	return nil
 }
@@ -106,7 +100,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	s.log.WithField("category_id", id).Debug("category delete")
+	s.log.Debug().Str("category_id", id).Msg("category delete")
 	result, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return fmt.Errorf(mongodb.ErrMsgQuery, err)
@@ -114,7 +108,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	if result.DeletedCount == 0 {
 		return fmt.Errorf(mongodb.ErrMsgQuery, mongo.ErrNoDocuments)
 	}
-	s.log.WithField("category_id", id).Debug("category deleted")
+	s.log.Debug().Str("category_id", id).Msg("category deleted")
 
 	return nil
 }
