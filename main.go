@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/go-funcards/category-service/internal/category"
 	"github.com/go-funcards/category-service/internal/category/db"
 	"github.com/go-funcards/category-service/internal/config"
@@ -32,8 +31,6 @@ const (
 
 var (
 	version     string
-	buildDate   string
-	buildTime   string
 	configFile  string
 	logLevelStr string
 	logLevel    zerolog.Level
@@ -57,10 +54,9 @@ func init() {
 		logLevel = zerolog.InfoLevel
 	}
 
-	if os.Getenv(envLogPretty) == "" {
-		logOutput = os.Stdout
-	} else {
-		logOutput = zerolog.ConsoleWriter{Out: os.Stdout}
+	logOutput = os.Stdout
+	if os.Getenv(envLogPretty) != "" {
+		logOutput = zerolog.ConsoleWriter{Out: logOutput}
 	}
 
 	zerolog.TimeFieldFormat = time.RFC3339Nano
@@ -80,7 +76,7 @@ func main() {
 		Str("system", "grpc").
 		Str("span.kind", "server").
 		Str("server.name", os.Args[0]).
-		Str("server.version", fmt.Sprintf("%s.%s.%s", version, buildDate, buildTime)).
+		Str("server.version", version).
 		Logger()
 
 	grpclog.SetLoggerV2(grpczerolog.New(log))
